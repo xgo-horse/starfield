@@ -55,16 +55,11 @@ class _StarfieldPaintState extends State<StarfieldPaint>
   void initState() {
     super.initState();
 
-    for (var i = 0; i < 20; i++) {
-      final star = Star(
-        size: Random().nextDouble() * 3 + 1,
-        x: widget.size.width / 2,
-        y: widget.size.height / 2,
-        dx: 1,
-        dy: 1,
+    for (var i = 0; i < 30; i++) {
+      final star = Star.random(
+        z: Random().nextDouble() * widget.size.longestSide / 2,
       );
 
-      star.randomize(widget.size);
       stars.add(star);
     }
 
@@ -75,9 +70,9 @@ class _StarfieldPaintState extends State<StarfieldPaint>
     _controller.addListener(() {
       for (var star in stars) {
         star.updatePosition();
-        if (star.x >= widget.size.width || star.x <= 0) {
+        if (star.position.dx.abs() >= widget.size.width / 2) {
           star.randomize(widget.size);
-        } else if (star.y >= widget.size.height || star.y <= 0) {
+        } else if (star.position.dy.abs() >= widget.size.height / 2) {
           star.randomize(widget.size);
         }
       }
@@ -109,7 +104,7 @@ class StarfieldPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     for (var star in stars) {
-      star.draw(canvas);
+      star.draw(canvas, size);
     }
   }
 
@@ -121,42 +116,57 @@ class StarfieldPainter extends CustomPainter {
 
 class Star {
   double size;
-  double x;
-  double y;
-  double dx;
-  double dy;
+  Offset position;
+  double direction;
+  double z;
+  double dz;
 
   Star({
     required this.size,
-    required this.x,
-    required this.y,
-    required this.dx,
-    required this.dy,
+    required this.position,
+    required this.direction,
+    required this.dz,
+    required this.z,
   });
 
-  void draw(Canvas canvas) {
+  factory Star.random({double z = 1}) {
+    final size = Random().nextDouble() * 1.5 + 1;
+    final direction = Random().nextDouble() * 2 * pi;
+    final dz = Random().nextDouble() + 1;
+    final position = Offset.fromDirection(direction, z);
+    return Star(
+      size: size,
+      direction: direction,
+      position: position,
+      dz: dz,
+      z: z,
+    );
+  }
+
+  void draw(Canvas canvas, Size canvasSize) {
     final paint = Paint()..color = Colors.white;
-    canvas.drawCircle(Offset(x, y), size, paint);
+    canvas.drawCircle(
+      Offset(
+        position.dx + canvasSize.width / 2,
+        position.dy + canvasSize.height / 2,
+      ),
+      size,
+      paint,
+    );
   }
 
   void updatePosition() {
-    x = x + dx;
-    y = y + dy;
+    z += dz;
+    size = size + 0.03;
+    dz += 0.07;
+    position = Offset.fromDirection(direction, z);
   }
 
   void randomize(Size canvasSize) {
-    double direction = Random().nextDouble() * pi * 2;
-    double distance = Random().nextDouble();
-    Offset center = Offset(canvasSize.width / 2, canvasSize.height / 2);
-    Offset positionOffset = Offset.fromDirection(
-      direction,
-      distance * canvasSize.width * 0.3,
-    );
-    Offset velocityOffset = Offset.fromDirection(direction, distance * 6 + 3);
-
-    x = center.dx + positionOffset.dx;
-    y = center.dy + positionOffset.dy;
-    dx = velocityOffset.dx;
-    dy = velocityOffset.dy;
+    size = Random().nextDouble() * 1.5 + 1;
+    direction = Random().nextDouble() * 2 * pi;
+    dz = Random().nextDouble() + 1;
+    z = canvasSize.shortestSide * Random().nextDouble() * 0.2;
+    position = Offset.fromDirection(direction, z);
   }
 }
