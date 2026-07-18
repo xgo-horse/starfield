@@ -67,39 +67,42 @@ class _StarfieldPaintState extends State<StarfieldPaint>
       vsync: this,
       duration: Duration(minutes: 1),
     );
-    _controller.addListener(() {
-      for (var star in stars) {
-        star.updatePosition();
-        if (star.position.dx.abs() >= widget.size.width / 2) {
-          star.randomize(widget.size);
-        } else if (star.position.dy.abs() >= widget.size.height / 2) {
-          star.randomize(widget.size);
-        }
-      }
-      setState(() {});
-    });
+    _controller.addListener(_updateStars);
     _controller.forward();
     _controller.repeat();
   }
 
+  void _updateStars() {
+    for (var star in stars) {
+      star.updatePosition();
+      if (star.position.dx.abs() >= widget.size.width / 2) {
+        star.randomize(widget.size);
+      } else if (star.position.dy.abs() >= widget.size.height / 2) {
+        star.randomize(widget.size);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      builder: (context, child) => child!,
-      animation: _controller,
-      child: CustomPaint(painter: StarfieldPainter(stars), size: widget.size),
+    return CustomPaint(
+      painter: StarfieldPainter(stars),
+      size: widget.size,
+      repaint: _controller,
     );
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_updateStars);
     _controller.dispose();
     super.dispose();
   }
 }
 
 class StarfieldPainter extends CustomPainter {
-  List<Star> stars;
+  final List<Star> stars;
+
   StarfieldPainter(this.stars);
   @override
   void paint(Canvas canvas, Size size) {
@@ -109,8 +112,8 @@ class StarfieldPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
+  bool shouldRepaint(covariant StarfieldPainter oldDelegate) {
+    return oldDelegate.stars != stars;
   }
 }
 
