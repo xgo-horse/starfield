@@ -117,15 +117,91 @@ class StarfieldPainter extends CustomPainter {
   }
 }
 
+class CometColors {
+  final Color ionStart;
+  final Color ionEnd;
+  final Color dustStart;
+  final Color dustMid;
+  final Color headGlow;
+  final Color headOuter;
+
+  const CometColors({
+    required this.ionStart,
+    required this.ionEnd,
+    required this.dustStart,
+    required this.dustMid,
+    required this.headGlow,
+    required this.headOuter,
+  });
+}
+
 class Star {
   static const double stretchSensitivity = 0.18;
   static const double maxStretch = 14.0;
+
+  static final List<CometColors> colorPatterns = [
+    // 1. Classic Ice Blue
+    const CometColors(
+      ionStart: Colors.blue,
+      ionEnd: Colors.cyan,
+      dustStart: Colors.cyan,
+      dustMid: Colors.cyanAccent,
+      headGlow: Colors.cyanAccent,
+      headOuter: Colors.blueAccent,
+    ),
+    // 2. Electric Teal
+    const CometColors(
+      ionStart: Colors.teal,
+      ionEnd: Colors.cyanAccent,
+      dustStart: Colors.cyanAccent,
+      dustMid: Colors.tealAccent,
+      headGlow: Colors.tealAccent,
+      headOuter: Colors.cyan,
+    ),
+    // 3. Royal Indigo
+    const CometColors(
+      ionStart: Colors.indigo,
+      ionEnd: Colors.blueAccent,
+      dustStart: Colors.blueAccent,
+      dustMid: Colors.lightBlueAccent,
+      headGlow: Colors.lightBlueAccent,
+      headOuter: Colors.blue,
+    ),
+    // 4. Cosmic Lavender
+    const CometColors(
+      ionStart: Colors.deepPurple,
+      ionEnd: Colors.purpleAccent,
+      dustStart: Colors.purpleAccent,
+      dustMid: Colors.pinkAccent,
+      headGlow: Colors.pinkAccent,
+      headOuter: Colors.deepPurpleAccent,
+    ),
+    // 5. Starlight Cyan
+    const CometColors(
+      ionStart: Colors.lightBlue,
+      ionEnd: Colors.cyanAccent,
+      dustStart: Colors.cyanAccent,
+      dustMid: Colors.white,
+      headGlow: Colors.white,
+      headOuter: Colors.cyanAccent,
+    ),
+    // 6. Soft Cobalt
+    const CometColors(
+      ionStart: Colors.blueAccent,
+      ionEnd: Colors.indigoAccent,
+      dustStart: Colors.indigoAccent,
+      dustMid: Colors.blue,
+      headGlow: Colors.blue,
+      headOuter: Colors.blueAccent,
+    ),
+  ];
 
   double size;
   Offset position;
   double direction;
   double z;
   double dz;
+  int colorPatternIndex;
 
   Star({
     required this.size,
@@ -133,6 +209,7 @@ class Star {
     required this.direction,
     required this.dz,
     required this.z,
+    required this.colorPatternIndex,
   });
 
   double get _stretchFactor =>
@@ -143,12 +220,14 @@ class Star {
     final direction = Random().nextDouble() * 2 * pi;
     final dz = Random().nextDouble() + 1;
     final position = Offset.fromDirection(direction, z);
+    final colorPatternIndex = Random().nextInt(colorPatterns.length);
     return Star(
       size: size,
       direction: direction,
       position: position,
       dz: dz,
       z: z,
+      colorPatternIndex: colorPatternIndex,
     );
   }
 
@@ -163,30 +242,31 @@ class Star {
     canvas.rotate(direction);
 
     final length = size * (_stretchFactor - 1) * 4.5;
+    final colors = colorPatterns[colorPatternIndex];
 
     if (length > 0) {
-      // 1. Draw Ion Tail (thin, long, electric blue)
+      // 1. Draw Ion Tail (thin, long, specific color)
       final ionTailPaint = Paint()
         ..shader = ui.Gradient.linear(
           Offset(-length * 1.8, 0),
           Offset.zero,
           [
-            Colors.blue.withValues(alpha: 0.0),
-            Colors.cyan.withValues(alpha: 0.5),
+            colors.ionStart.withValues(alpha: 0.0),
+            colors.ionEnd.withValues(alpha: 0.5),
           ],
         )
         ..strokeWidth = size * 0.4
         ..style = PaintingStyle.stroke;
       canvas.drawLine(Offset(-length * 1.8, 0), Offset.zero, ionTailPaint);
 
-      // 2. Draw Dust Tail (broad, tapering, cyan/white)
+      // 2. Draw Dust Tail (broad, tapering, specific color/white)
       final dustTailPaint = Paint()
         ..shader = ui.Gradient.linear(
           Offset(-length, 0),
           Offset.zero,
           [
-            Colors.cyan.withValues(alpha: 0.0),
-            Colors.cyanAccent.withValues(alpha: 0.3),
+            colors.dustStart.withValues(alpha: 0.0),
+            colors.dustMid.withValues(alpha: 0.3),
             Colors.white.withValues(alpha: 0.6),
           ],
           [0.0, 0.6, 1.0],
@@ -206,14 +286,14 @@ class Star {
           size * 1.5,
           [
             Colors.white,
-            Colors.cyanAccent.withValues(alpha: 0.8),
-            Colors.blueAccent.withValues(alpha: 0.0),
+            colors.headGlow.withValues(alpha: 0.8),
+            colors.headOuter.withValues(alpha: 0.0),
           ],
           [0.0, 0.4, 1.0],
         );
       canvas.drawCircle(Offset.zero, size * 1.5, headPaint);
     } else {
-      final paint = Paint()..color = Colors.white;
+      final paint = Paint()..color = colors.headGlow;
       canvas.drawCircle(Offset.zero, size, paint);
     }
 
@@ -233,5 +313,6 @@ class Star {
     dz = Random().nextDouble() + 1;
     z = canvasSize.shortestSide * Random().nextDouble() * 0.2;
     position = Offset.fromDirection(direction, z);
+    colorPatternIndex = Random().nextInt(colorPatterns.length);
   }
 }
