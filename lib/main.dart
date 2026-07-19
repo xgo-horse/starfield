@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -14,7 +15,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Starfield',
-      theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.deepPurple)),
+      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
       home: const MyHomePage(title: 'Starfield'),
     );
   }
@@ -152,7 +153,6 @@ class Star {
   }
 
   void draw(Canvas canvas, Size canvasSize) {
-    final paint = Paint()..color = Colors.white;
     final center = Offset(
       position.dx + canvasSize.width / 2,
       position.dy + canvasSize.height / 2,
@@ -161,8 +161,62 @@ class Star {
     canvas.save();
     canvas.translate(center.dx, center.dy);
     canvas.rotate(direction);
-    canvas.scale(_stretchFactor, 1.0);
-    canvas.drawCircle(Offset.zero, size, paint);
+
+    final length = size * (_stretchFactor - 1) * 4.5;
+
+    if (length > 0) {
+      // 1. Draw Ion Tail (thin, long, electric blue)
+      final ionTailPaint = Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(-length * 1.8, 0),
+          Offset.zero,
+          [
+            Colors.blue.withValues(alpha: 0.0),
+            Colors.cyan.withValues(alpha: 0.5),
+          ],
+        )
+        ..strokeWidth = size * 0.4
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(Offset(-length * 1.8, 0), Offset.zero, ionTailPaint);
+
+      // 2. Draw Dust Tail (broad, tapering, cyan/white)
+      final dustTailPaint = Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(-length, 0),
+          Offset.zero,
+          [
+            Colors.cyan.withValues(alpha: 0.0),
+            Colors.cyanAccent.withValues(alpha: 0.3),
+            Colors.white.withValues(alpha: 0.6),
+          ],
+          [0.0, 0.6, 1.0],
+        );
+
+      final dustTailPath = Path()
+        ..moveTo(0, -size * 1.2)
+        ..quadraticBezierTo(-length * 0.3, -size * 0.8, -length, 0)
+        ..quadraticBezierTo(-length * 0.3, size * 0.8, 0, size * 1.2)
+        ..close();
+      canvas.drawPath(dustTailPath, dustTailPaint);
+
+      // 3. Draw Comet Head (bright glowing nucleus/coma)
+      final headPaint = Paint()
+        ..shader = ui.Gradient.radial(
+          Offset.zero,
+          size * 1.5,
+          [
+            Colors.white,
+            Colors.cyanAccent.withValues(alpha: 0.8),
+            Colors.blueAccent.withValues(alpha: 0.0),
+          ],
+          [0.0, 0.4, 1.0],
+        );
+      canvas.drawCircle(Offset.zero, size * 1.5, headPaint);
+    } else {
+      final paint = Paint()..color = Colors.white;
+      canvas.drawCircle(Offset.zero, size, paint);
+    }
+
     canvas.restore();
   }
 
