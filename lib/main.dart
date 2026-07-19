@@ -117,6 +117,9 @@ class StarfieldPainter extends CustomPainter {
 }
 
 class Star {
+  static const double stretchSensitivity = 0.18;
+  static const double maxStretch = 14.0;
+
   double size;
   Offset position;
   double direction;
@@ -130,6 +133,9 @@ class Star {
     required this.dz,
     required this.z,
   });
+
+  double get _stretchFactor =>
+      (1.0 + dz * stretchSensitivity).clamp(1.0, maxStretch);
 
   factory Star.random({double z = 1}) {
     final size = Random().nextDouble() * 1.5 + 1;
@@ -147,14 +153,17 @@ class Star {
 
   void draw(Canvas canvas, Size canvasSize) {
     final paint = Paint()..color = Colors.white;
-    canvas.drawCircle(
-      Offset(
-        position.dx + canvasSize.width / 2,
-        position.dy + canvasSize.height / 2,
-      ),
-      size,
-      paint,
+    final center = Offset(
+      position.dx + canvasSize.width / 2,
+      position.dy + canvasSize.height / 2,
     );
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(direction);
+    canvas.scale(_stretchFactor, 1.0);
+    canvas.drawCircle(Offset.zero, size, paint);
+    canvas.restore();
   }
 
   void updatePosition() {
