@@ -86,9 +86,8 @@ class _StarfieldPaintState extends State<StarfieldPaint>
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: StarfieldPainter(stars),
+      painter: StarfieldPainter(stars, repaint: _controller),
       size: widget.size,
-      repaint: _controller,
     );
   }
 
@@ -103,7 +102,7 @@ class _StarfieldPaintState extends State<StarfieldPaint>
 class StarfieldPainter extends CustomPainter {
   final List<Star> stars;
 
-  StarfieldPainter(this.stars);
+  StarfieldPainter(this.stars, {super.repaint});
   @override
   void paint(Canvas canvas, Size size) {
     for (var star in stars) {
