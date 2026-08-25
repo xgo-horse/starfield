@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -15,7 +16,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Starfield',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      ),
       home: const MyHomePage(title: 'Starfield'),
     );
   }
@@ -49,8 +52,10 @@ class StarfieldPaint extends StatefulWidget {
 
 class _StarfieldPaintState extends State<StarfieldPaint>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+  late final Ticker _ticker;
+  final ValueNotifier<int> _repaint = ValueNotifier(0);
   final List<Star> stars = [];
+  Duration _lastElapsed = Duration.zero;
 
   @override
   void initState() {
@@ -64,38 +69,44 @@ class _StarfieldPaintState extends State<StarfieldPaint>
       stars.add(star);
     }
 
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(minutes: 1),
-    );
-    _controller.addListener(_updateStars);
-    _controller.forward();
-    _controller.repeat();
+    _ticker = createTicker(_onTick)..start();
   }
 
-  void _updateStars() {
+  void _onTick(Duration elapsed) {
+    final dt =
+        (elapsed - _lastElapsed).inMicroseconds /
+        Duration.microsecondsPerSecond;
+    _lastElapsed = elapsed;
+    if (dt <= 0) return;
+
+    // Original tuning assumed a 60fps frame step; scale by elapsed time
+    // so motion speed stays consistent regardless of actual frame rate.
+    final dtFrames = dt * 60;
+
     for (var star in stars) {
-      star.updatePosition();
+      star.updatePosition(dtFrames);
       if (star.position.dx.abs() >= widget.size.width / 2) {
         star.randomize(widget.size);
       } else if (star.position.dy.abs() >= widget.size.height / 2) {
         star.randomize(widget.size);
       }
     }
+
+    _repaint.value++;
   }
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: StarfieldPainter(stars, repaint: _controller),
+      painter: StarfieldPainter(stars, repaint: _repaint),
       size: widget.size,
     );
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_updateStars);
-    _controller.dispose();
+    _ticker.dispose();
+    _repaint.dispose();
     super.dispose();
   }
 }
@@ -138,6 +149,7 @@ class CometColors {
 class Star {
   static const double stretchSensitivity = 0.18;
   static const double maxStretch = 14.0;
+  static const double speedMultiplier = 2.0;
 
   static final List<CometColors> colorPatterns = [
     // 1. Classic Ice Blue
@@ -203,6 +215,13 @@ class Star {
   double dz;
   int colorPatternIndex;
 
+  Paint? _ionTailPaint;
+  Paint? _dustTailPaint;
+  Paint? _headPaint;
+  Path? _dustTailPath;
+  double? _cachedLength;
+  double? _cachedSize;
+
   Star({
     required this.size,
     required this.position,
@@ -245,53 +264,58 @@ class Star {
     final colors = colorPatterns[colorPatternIndex];
 
     if (length > 0) {
-      // 1. Draw Ion Tail (thin, long, specific color)
-      final ionTailPaint = Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(-length * 1.8, 0),
-          Offset.zero,
-          [
+      if (_cachedLength == null || (length - _cachedLength!).abs() > 0.5) {
+        // 1. Ion Tail (thin, long, specific color)
+        _ionTailPaint = Paint()
+          ..shader = ui.Gradient.linear(Offset(-length * 1.8, 0), Offset.zero, [
             colors.ionStart.withValues(alpha: 0.0),
             colors.ionEnd.withValues(alpha: 0.5),
-          ],
-        )
-        ..strokeWidth = size * 0.4
-        ..style = PaintingStyle.stroke;
-      canvas.drawLine(Offset(-length * 1.8, 0), Offset.zero, ionTailPaint);
+          ])
+          ..strokeWidth = size * 0.4
+          ..style = PaintingStyle.stroke;
 
-      // 2. Draw Dust Tail (broad, tapering, specific color/white)
-      final dustTailPaint = Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(-length, 0),
-          Offset.zero,
-          [
-            colors.dustStart.withValues(alpha: 0.0),
-            colors.dustMid.withValues(alpha: 0.3),
-            Colors.white.withValues(alpha: 0.6),
-          ],
-          [0.0, 0.6, 1.0],
-        );
+        // 2. Dust Tail (broad, tapering, specific color/white)
+        _dustTailPaint = Paint()
+          ..shader = ui.Gradient.linear(
+            Offset(-length, 0),
+            Offset.zero,
+            [
+              colors.dustStart.withValues(alpha: 0.0),
+              colors.dustMid.withValues(alpha: 0.3),
+              Colors.white.withValues(alpha: 0.6),
+            ],
+            [0.0, 0.6, 1.0],
+          );
 
-      final dustTailPath = Path()
-        ..moveTo(0, -size * 1.2)
-        ..quadraticBezierTo(-length * 0.3, -size * 0.8, -length, 0)
-        ..quadraticBezierTo(-length * 0.3, size * 0.8, 0, size * 1.2)
-        ..close();
-      canvas.drawPath(dustTailPath, dustTailPaint);
+        _dustTailPath = (_dustTailPath ?? Path())
+          ..reset()
+          ..moveTo(0, -size * 1.2)
+          ..quadraticBezierTo(-length * 0.3, -size * 0.8, -length, 0)
+          ..quadraticBezierTo(-length * 0.3, size * 0.8, 0, size * 1.2)
+          ..close();
 
-      // 3. Draw Comet Head (bright glowing nucleus/coma)
-      final headPaint = Paint()
-        ..shader = ui.Gradient.radial(
-          Offset.zero,
-          size * 1.5,
-          [
-            Colors.white,
-            colors.headGlow.withValues(alpha: 0.8),
-            colors.headOuter.withValues(alpha: 0.0),
-          ],
-          [0.0, 0.4, 1.0],
-        );
-      canvas.drawCircle(Offset.zero, size * 1.5, headPaint);
+        _cachedLength = length;
+      }
+
+      if (_cachedSize == null || (size - _cachedSize!).abs() > 0.05) {
+        // 3. Comet Head (bright glowing nucleus/coma)
+        _headPaint = Paint()
+          ..shader = ui.Gradient.radial(
+            Offset.zero,
+            size * 1.5,
+            [
+              Colors.white,
+              colors.headGlow.withValues(alpha: 0.8),
+              colors.headOuter.withValues(alpha: 0.0),
+            ],
+            [0.0, 0.4, 1.0],
+          );
+        _cachedSize = size;
+      }
+
+      canvas.drawLine(Offset(-length * 1.8, 0), Offset.zero, _ionTailPaint!);
+      canvas.drawPath(_dustTailPath!, _dustTailPaint!);
+      canvas.drawCircle(Offset.zero, size * 1.5, _headPaint!);
     } else {
       final paint = Paint()..color = colors.headGlow;
       canvas.drawCircle(Offset.zero, size, paint);
@@ -300,10 +324,11 @@ class Star {
     canvas.restore();
   }
 
-  void updatePosition() {
-    z += dz;
-    size = size + 0.03;
-    dz += 0.07;
+  void updatePosition(double dtFrames) {
+    final step = dtFrames * speedMultiplier;
+    z += dz * step;
+    size = size + 0.03 * step;
+    dz += 0.07 * step;
     position = Offset.fromDirection(direction, z);
   }
 
@@ -314,5 +339,7 @@ class Star {
     z = canvasSize.shortestSide * Random().nextDouble() * 0.2;
     position = Offset.fromDirection(direction, z);
     colorPatternIndex = Random().nextInt(colorPatterns.length);
+    _cachedLength = null;
+    _cachedSize = null;
   }
 }
