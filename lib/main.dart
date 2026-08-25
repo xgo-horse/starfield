@@ -52,16 +52,27 @@ class StarfieldPaint extends StatefulWidget {
 
 class _StarfieldPaintState extends State<StarfieldPaint>
     with SingleTickerProviderStateMixin {
+  // One star per this many logical pixels of screen area.
+  static const double _areaPerStar = 8000;
+  static const int _minStarCount = 10;
+  static const int _maxStarCount = 400;
+
   late final Ticker _ticker;
   final ValueNotifier<int> _repaint = ValueNotifier(0);
   final List<Star> stars = [];
   Duration _lastElapsed = Duration.zero;
 
+  int _starCountForSize(Size size) {
+    final area = size.width * size.height;
+    return (area / _areaPerStar).round().clamp(_minStarCount, _maxStarCount);
+  }
+
   @override
   void initState() {
     super.initState();
 
-    for (var i = 0; i < 30; i++) {
+    final starCount = _starCountForSize(widget.size);
+    for (var i = 0; i < starCount; i++) {
       final star = Star.random(
         z: Random().nextDouble() * widget.size.longestSide / 2,
       );
@@ -70,6 +81,23 @@ class _StarfieldPaintState extends State<StarfieldPaint>
     }
 
     _ticker = createTicker(_onTick)..start();
+  }
+
+  @override
+  void didUpdateWidget(covariant StarfieldPaint oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.size == oldWidget.size) return;
+
+    final targetCount = _starCountForSize(widget.size);
+    if (stars.length < targetCount) {
+      while (stars.length < targetCount) {
+        stars.add(
+          Star.random(z: Random().nextDouble() * widget.size.longestSide / 2),
+        );
+      }
+    } else if (stars.length > targetCount) {
+      stars.removeRange(targetCount, stars.length);
+    }
   }
 
   void _onTick(Duration elapsed) {
