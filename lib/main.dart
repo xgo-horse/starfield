@@ -53,9 +53,9 @@ class StarfieldPaint extends StatefulWidget {
 class _StarfieldPaintState extends State<StarfieldPaint>
     with SingleTickerProviderStateMixin {
   // One star per this many logical pixels of screen area.
-  static const double _areaPerStar = 8000;
+  static const double _areaPerStar = 16000;
   static const int _minStarCount = 10;
-  static const int _maxStarCount = 400;
+  static const int _maxStarCount = 200;
 
   late final Ticker _ticker;
   final ValueNotifier<int> _repaint = ValueNotifier(0);
